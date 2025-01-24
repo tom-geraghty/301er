@@ -169,3 +169,15 @@ if __name__ == '__main__':
 
     # Run Flask in debug mode (not for production)
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)
+
+# app.py
+
+# ...
+# (all imports, routes, etc.)
+
+# Initialize DB schema on import or startup:
+init_db()
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)
+
