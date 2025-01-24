@@ -35,10 +35,13 @@
     <div class="mb-3">
       <label for="trigger_email" class="form-label">Email Address (optional)</label>
       <input type="email" class="form-control" id="trigger_email" name="trigger_email" placeholder="you@example.com">
+      <small class="text-muted">Up to 5 email notifications will be sent total.</small>
     </div>
     <div class="mb-3">
-      <label for="trigger_webhook" class="form-label">Webhook URL (optional)</label>
-      <input type="url" class="form-control" id="trigger_webhook" name="trigger_webhook" placeholder="https://maker.ifttt.com/trigger/...">
+      <label for="exceeded_url" class="form-label">Exceeded URL (optional)</label>
+      <input type="url" class="form-control" id="exceeded_url" name="exceeded_url"
+             placeholder="https://bing.com (for instance)">
+      <small class="text-muted">When the max redirect count is reached, users will be sent here.</small>
     </div>
     <button type="submit" class="btn btn-primary">Create Link</button>
   </form>
