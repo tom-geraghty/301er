@@ -1,12 +1,17 @@
 import os
 import sqlite3
 import re
+from datetime import datetime
 from flask import Flask, request, redirect, render_template, url_for
 import requests
 
 app = Flask(__name__)
 
 DATABASE = 'database.db'
+
+# For SendLayer
+SENDLAYER_API_KEY = os.environ.get('SENDLAYER_API_KEY')  # e.g. store in Render env variable
+SENDLAYER_FROM_EMAIL = os.environ.get('SENDLAYER_FROM_EMAIL', 'noreply@example.com')
 
 # ----- Basic Bot Detection Setup -----
 KNOWN_BOT_PATTERNS = [
@@ -30,8 +35,9 @@ def get_db():
     return conn
 
 def init_db():
-    """Create the table if it doesn't exist."""
+    """Create or update the table if it doesn't exist, adding any new columns if necessary."""
     with get_db() as conn:
+        # Create the base table if needed
         conn.execute('''
             CREATE TABLE IF NOT EXISTS redirect_links (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,7 +46,8 @@ def init_db():
                 max_redirects INTEGER NOT NULL,
                 current_count INTEGER NOT NULL DEFAULT 0,
                 trigger_email TEXT,
-                trigger_webhook TEXT
+                exceeded_url TEXT,
+                email_count INTEGER NOT NULL DEFAULT 0
             );
         ''')
     print("Database initialized.")
@@ -53,28 +60,48 @@ def generate_short_id():
 
 
 # ----- Notification Triggers -----
-def send_email_notification(email_address, short_id, original_url):
+def send_email_notification(api_key, from_email, to_email, short_id,
+                            original_url, user_agent, ip, click_time):
     """
-    Stub for sending an email notification. 
-    In production, integrate with an email service like SendGrid, Mailgun, or SES.
+    Sends an email via SendLayer when a redirect occurs.
+    Modify the payload/endpoint according to SendLayer docs.
     """
-    print(f"[DEBUG] Sending email to {email_address}: Link {short_id} was just used to redirect to {original_url}.")
+    if not api_key:
+        print("[WARNING] SENDLAYER_API_KEY is not set. Email not sent.")
+        return
 
+    url = "https://api.sendlayer.com/v1/email/send"  # Check the official endpoint
+    subject = f"Link {short_id} triggered"
+    content = f"""
+    The link {short_id} was just used.
+    Original URL: {original_url}
+    IP: {ip}
+    User-Agent: {user_agent}
+    Timestamp: {click_time}
+    """
 
-def trigger_webhook(webhook_url, short_id, original_url):
-    """
-    Stub for triggering a webhook (e.g. IFTTT, Zapier).
-    """
     payload = {
-        'short_id': short_id,
-        'original_url': original_url,
-        'event': 'redirect_occurred'
+        "to": [
+            {"email": to_email}
+        ],
+        "from": {"email": from_email},
+        "subject": subject,
+        "content": content
     }
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+
     try:
-        response = requests.post(webhook_url, json=payload)
-        print(f"[DEBUG] Webhook response status: {response.status_code}")
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        if response.status_code >= 200 and response.status_code < 300:
+            print(f"[DEBUG] Email sent to {to_email} via SendLayer.")
+        else:
+            print(f"[ERROR] SendLayer response: {response.status_code}, {response.text}")
     except Exception as e:
-        print(f"[ERROR] Failed to call webhook: {e}")
+        print(f"[ERROR] Exception while sending email: {e}")
 
 
 # ----- Flask Routes -----
@@ -89,7 +116,7 @@ def index():
         original_url = request.form.get('original_url', '').strip()
         max_redirects = request.form.get('max_redirects', '1')
         trigger_email = request.form.get('trigger_email', '').strip()
-        trigger_webhook = request.form.get('trigger_webhook', '').strip()
+        exceeded_url = request.form.get('exceeded_url', '').strip()
 
         # Basic validation
         if not original_url:
@@ -109,9 +136,10 @@ def index():
         # Insert into DB
         with get_db() as conn:
             conn.execute('''
-                INSERT INTO redirect_links (short_id, original_url, max_redirects, current_count, trigger_email, trigger_webhook)
-                VALUES (?, ?, ?, 0, ?, ?);
-            ''', (short_id, original_url, max_redirects, trigger_email, trigger_webhook))
+                INSERT INTO redirect_links
+                (short_id, original_url, max_redirects, current_count, trigger_email, exceeded_url, email_count)
+                VALUES (?, ?, ?, 0, ?, ?, 0);
+            ''', (short_id, original_url, max_redirects, trigger_email, exceeded_url))
 
         # Return or show result
         short_url = request.url_root.rstrip('/') + url_for('redirect_handler', short_id=short_id)
@@ -126,58 +154,68 @@ def redirect_handler(short_id):
     """
     When someone accesses /r/<short_id>, we check:
     - If it exists in DB
-    - If current_count < max_redirects
-    - Check if request is from a bot
-    - If valid (and not a bot), increment count & trigger notifications
-    - Then 301 redirect to original URL
-    - Otherwise, return an 'expired' page
+    - If current_count < max_redirects -> increment, optionally send email (up to 5 times), redirect to original
+    - If limit is exceeded -> redirect to 'exceeded_url' if provided, otherwise show 'expired' page
+    - Filter out bots by user-agent (no increment or email if bot)
     """
     user_agent = request.headers.get('User-Agent', '')
+    ip = request.remote_addr or 'Unknown IP'
+    click_time = datetime.utcnow().isoformat()
+
     with get_db() as conn:
         row = conn.execute('SELECT * FROM redirect_links WHERE short_id = ?;', (short_id,)).fetchone()
 
         if not row:
             return render_template('expired.html', message="This link does not exist."), 404
 
-        # Check redirect limit
+        # If we've already reached the limit
         if row['current_count'] >= row['max_redirects']:
-            # Already exceeded limit
-            return render_template('expired.html', message="This link has expired."), 200
+            # If there's an exceeded_url, redirect there; else show an expired page
+            if row['exceeded_url']:
+                return redirect(row['exceeded_url'], code=301)
+            else:
+                return render_template('expired.html', message="This link has expired."), 200
 
-        # Determine if we should increment and trigger notifications
-        if not is_bot(user_agent):
+        # We haven't hit the limit yet
+        # Check if it's a bot
+        if is_bot(user_agent):
+            # Bot: do NOT increment or send email, but still go to original_url?
+            # Or skip redirect? You can decide. Let's skip the increment & triggers, but still redirect.
+            return redirect(row['original_url'], code=301)
+        else:
             new_count = row['current_count'] + 1
-            conn.execute(
-                'UPDATE redirect_links SET current_count = ? WHERE short_id = ?',
-                (new_count, short_id)
-            )
+            # Also see if we can still send an email (only up to 5 times)
+            new_email_count = row['email_count']
+            if row['trigger_email'] and row['email_count'] < 5:
+                # Send the email
+                send_email_notification(
+                    api_key=SENDLAYER_API_KEY,
+                    from_email=SENDLAYER_FROM_EMAIL,
+                    to_email=row['trigger_email'],
+                    short_id=row['short_id'],
+                    original_url=row['original_url'],
+                    user_agent=user_agent,
+                    ip=ip,
+                    click_time=click_time
+                )
+                new_email_count += 1
 
-            # Triggers
-            if row['trigger_email']:
-                send_email_notification(row['trigger_email'], short_id, row['original_url'])
-            if row['trigger_webhook']:
-                trigger_webhook(row['trigger_webhook'], short_id, row['original_url'])
+            # Update DB
+            conn.execute('''
+                UPDATE redirect_links
+                SET current_count = ?, email_count = ?
+                WHERE short_id = ?
+            ''', (new_count, new_email_count, short_id))
 
-    # Do the actual redirect
+    # Finally, redirect to the original URL
     return redirect(row['original_url'], code=301)
 
 
 # ----- Main Entrypoint -----
-if __name__ == '__main__':
-    # Initialize DB schema
-    init_db()
-
-    # Run Flask in debug mode (not for production)
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)
-
-# app.py
-
-# ...
-# (all imports, routes, etc.)
-
-# Initialize DB schema on import or startup:
+# Move init_db() outside of the if __name__ == '__main__' block
+# so it's called on Render when Gunicorn starts.
 init_db()
 
 if __name__ == '__main__':
+    # For local dev
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)
-
