@@ -8,7 +8,7 @@
 </head>
 <body class="bg-light">
 <div class="container py-5">
-  <h1 class="mb-4">Create a New Redirect</h1>
+  <h1 class="mb-4">Supercharged 301s</h1>
   
   {% if error %}
     <div class="alert alert-danger" role="alert">
@@ -24,24 +24,24 @@
 
   <form method="POST" action="/">
     <div class="mb-3">
-      <label for="original_url" class="form-label">Original URL</label>
+      <label for="original_url" class="form-label">Where do you want the link to forward to?</label>
       <input type="text" class="form-control" id="original_url" name="original_url"
              placeholder="https://example.com" required>
     </div>
     <div class="mb-3">
-      <label for="max_redirects" class="form-label">Max Redirects (1-1000)</label>
+      <label for="max_redirects" class="form-label">For how many clicks? (1-5)</label>
       <input type="number" class="form-control" id="max_redirects" name="max_redirects" value="1" min="1" max="1000">
     </div>
     <div class="mb-3">
-      <label for="trigger_email" class="form-label">Email Address (optional)</label>
+      <label for="trigger_email" class="form-label">Enter your Email Address if you want to be notified when it's clicked (optional)</label>
       <input type="email" class="form-control" id="trigger_email" name="trigger_email" placeholder="you@example.com">
-      <small class="text-muted">Up to 5 email notifications will be sent total.</small>
+      <small class="text-muted">We don't store your email address for any longer than is required</small>
     </div>
     <div class="mb-3">
-      <label for="exceeded_url" class="form-label">Exceeded URL (optional)</label>
+      <label for="exceeded_url" class="form-label">After the maximum clicks are exceeded, where do you want the link to go?</label>
       <input type="url" class="form-control" id="exceeded_url" name="exceeded_url"
              placeholder="https://bing.com (for instance)">
-      <small class="text-muted">When the max redirect count is reached, users will be sent here.</small>
+      <small class="text-muted">(optional - if nothing is entered, visits will see a "link expired" notice.)/small>
     </div>
     <button type="submit" class="btn btn-primary">Create Link</button>
   </form>
