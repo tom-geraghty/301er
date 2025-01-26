@@ -76,9 +76,9 @@ def send_email_notification(api_key, from_email, to_email, short_id,
     # According to the latest docs, the base URL is console.sendlayer.com/api/v1/
     url = "https://console.sendlayer.com/api/v1/email"
 
-    Subject = f"Link {short_id} triggered"
+    subject = f"Link {short_id} triggered"
 
-    PlainContent = (
+    plain_content = (
         f"The link {short_id} was just used.\n\n"
         f"Original URL: {original_url}\n"
         f"IP: {ip}\n"
@@ -86,7 +86,7 @@ def send_email_notification(api_key, from_email, to_email, short_id,
         f"Timestamp: {click_time}\n"
     )
 
-    HTMLContent = (
+    html_content = (
         f"<p>The link <strong>{short_id}</strong> was just used.</p>"
         f"<ul>"
         f"<li>Original URL: {original_url}</li>"
@@ -111,8 +111,8 @@ def send_email_notification(api_key, from_email, to_email, short_id,
         ],
         "Subject": subject,
         "ContentType": "HTML",         # Must match "HTML" or "text" or whichever type you intend.
-        "HTMLContent": HTMLContent,
-        "PlainContent": PlainContent
+        "HTMLContent": html_content,
+        "PlainContent": plain_content
 
         # Optional keys you can include:
         # "Tags": ["tag1", "tag2"],
