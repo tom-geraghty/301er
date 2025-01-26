@@ -60,20 +60,24 @@ def generate_short_id():
 
 
 # ----- Notification Triggers -----
+import requests
+
 def send_email_notification(api_key, from_email, to_email, short_id,
                             original_url, user_agent, ip, click_time):
     """
     Sends an email via SendLayer when a redirect occurs.
-    Modify the payload/endpoint according to SendLayer docs.
+    Uses the 'console.sendlayer.com/api/v1/email' endpoint and
+    the JSON format specified in SendLayer's current documentation.
     """
     if not api_key:
         print("[WARNING] SENDLAYER_API_KEY is not set. Email not sent.")
         return
 
+    # According to the latest docs, the base URL is console.sendlayer.com/api/v1/
     url = "https://console.sendlayer.com/api/v1/email"
 
     subject = f"Link {short_id} triggered"
-    # For demonstration, we’ll send both plain text and HTML content:
+
     plain_content = (
         f"The link {short_id} was just used.\n\n"
         f"Original URL: {original_url}\n"
@@ -81,6 +85,7 @@ def send_email_notification(api_key, from_email, to_email, short_id,
         f"User-Agent: {user_agent}\n"
         f"Timestamp: {click_time}\n"
     )
+
     html_content = (
         f"<p>The link <strong>{short_id}</strong> was just used.</p>"
         f"<ul>"
@@ -91,22 +96,29 @@ def send_email_notification(api_key, from_email, to_email, short_id,
         f"</ul>"
     )
 
+    # Notice how "From", "To", "Subject", "ContentType", "HTMLContent", "PlainContent"
+    # are capitalized to match the docs exactly.
     payload = {
-        "to": [
+        "From": {
+            # "name": "Optional Sender Name",
+            "email": from_email
+        },
+        "To": [
             {
+                # "name": "Optional Recipient Name",
                 "email": to_email
-                # "name": "Optional Recipient Name"
             }
         ],
-        "from": {
-            "email": from_email
-            # "name": "Optional Sender Name"
-        },
-        "subject": subject,
-        "content": {
-            "plain": plain_content,
-            "html": html_content
-        }
+        "Subject": subject,
+        "ContentType": "HTML",         # Must match "HTML" or "text" or whichever type you intend.
+        "HTMLContent": html_content,
+        "PlainContent": plain_content
+
+        # Optional keys you can include:
+        # "Tags": ["tag1", "tag2"],
+        # "Headers": {
+        #     "X-Mailer": "Flask Application"
+        # },
     }
 
     headers = {
@@ -117,7 +129,7 @@ def send_email_notification(api_key, from_email, to_email, short_id,
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=10)
         if 200 <= response.status_code < 300:
-            print(f"[DEBUG] Email sent to {to_email} via SendLayer.")
+            print(f"[DEBUG] Email sent to {to_email} via SendLayer. Response: {response.json()}")
         else:
             print(f"[ERROR] SendLayer response: {response.status_code}, {response.text}")
     except Exception as e:
