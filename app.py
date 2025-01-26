@@ -70,23 +70,43 @@ def send_email_notification(api_key, from_email, to_email, short_id,
         print("[WARNING] SENDLAYER_API_KEY is not set. Email not sent.")
         return
 
-    url = "https://console.sendlayer.com/api/v1/email"  # Check the official endpoint
+    url = "https://console.sendlayer.com/api/v1/email"
+
     subject = f"Link {short_id} triggered"
-    content = f"""
-    The link {short_id} was just used.
-    Original URL: {original_url}
-    IP: {ip}
-    User-Agent: {user_agent}
-    Timestamp: {click_time}
-    """
+    # For demonstration, we’ll send both plain text and HTML content:
+    plain_content = (
+        f"The link {short_id} was just used.\n\n"
+        f"Original URL: {original_url}\n"
+        f"IP: {ip}\n"
+        f"User-Agent: {user_agent}\n"
+        f"Timestamp: {click_time}\n"
+    )
+    html_content = (
+        f"<p>The link <strong>{short_id}</strong> was just used.</p>"
+        f"<ul>"
+        f"<li>Original URL: {original_url}</li>"
+        f"<li>IP: {ip}</li>"
+        f"<li>User-Agent: {user_agent}</li>"
+        f"<li>Timestamp: {click_time}</li>"
+        f"</ul>"
+    )
 
     payload = {
         "to": [
-            {"email": to_email}
+            {
+                "email": to_email
+                # "name": "Optional Recipient Name"
+            }
         ],
-        "from": {"email": from_email},
+        "from": {
+            "email": from_email
+            # "name": "Optional Sender Name"
+        },
         "subject": subject,
-        "content": content
+        "content": {
+            "plain": plain_content,
+            "html": html_content
+        }
     }
 
     headers = {
@@ -96,12 +116,13 @@ def send_email_notification(api_key, from_email, to_email, short_id,
 
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=10)
-        if response.status_code >= 200 and response.status_code < 300:
+        if 200 <= response.status_code < 300:
             print(f"[DEBUG] Email sent to {to_email} via SendLayer.")
         else:
             print(f"[ERROR] SendLayer response: {response.status_code}, {response.text}")
     except Exception as e:
         print(f"[ERROR] Exception while sending email: {e}")
+
 
 
 # ----- Flask Routes -----
