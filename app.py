@@ -70,7 +70,7 @@ def send_email_notification(api_key, from_email, to_email, short_id,
         print("[WARNING] SENDLAYER_API_KEY is not set. Email not sent.")
         return
 
-    url = "https://console.sendlayer.com/api/v1/email"
+    url = "https://api.sendlayer.com/v1/email/send"
 
     subject = f"Link {short_id} triggered"
     # For demonstration, we’ll send both plain text and HTML content:
