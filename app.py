@@ -12,6 +12,7 @@ DATABASE = 'database.db'
 # For SendLayer
 SENDLAYER_API_KEY = os.environ.get('SENDLAYER_API_KEY')  # e.g. store in Render env variable
 SENDLAYER_FROM_EMAIL = os.environ.get('SENDLAYER_FROM_EMAIL', 'noreply@301er.io')
+SENDLAYER_FROM_NAME = os.environ.get("SENDLAYER_FROM_NAME", "301er.com")
 
 # ----- Basic Bot Detection Setup -----
 KNOWN_BOT_PATTERNS = [
