@@ -5,46 +5,89 @@
   <title>Create a Redirect</title>
   <!-- Load Bootstrap CSS from a CDN -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+  <!-- Viewport Meta Tag for Responsive Rendering on Mobile -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body class="bg-light">
-<div class="container py-5">
-  <h1 class="mb-4">Supercharged 301s</h1>
-  
-  {% if error %}
-    <div class="alert alert-danger" role="alert">
-      {{ error }}
-    </div>
-  {% endif %}
+  <div class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-12 col-md-8 col-lg-6">
+        
+        <h1 class="mb-4 text-center">Supercharged 301s</h1>
+        
+        {% if error %}
+          <div class="alert alert-danger" role="alert">
+            {{ error }}
+          </div>
+        {% endif %}
 
-  {% if short_url %}
-    <div class="alert alert-success" role="alert">
-      Your new link is: <a href="{{ short_url }}" target="_blank">{{ short_url }}</a>
-    </div>
-  {% endif %}
+        {% if short_url %}
+          <div class="alert alert-success" role="alert">
+            Your new link is: <a href="{{ short_url }}" target="_blank">{{ short_url }}</a>
+          </div>
+        {% endif %}
 
-  <form method="POST" action="/">
-    <div class="mb-3">
-      <label for="original_url" class="form-label">Where do you want the link to forward to?</label>
-      <input type="text" class="form-control" id="original_url" name="original_url"
-             placeholder="https://example.com" required>
+        <form method="POST" action="/">
+          <div class="mb-3">
+            <label for="original_url" class="form-label">Where do you want the link to forward to?</label>
+            <input 
+              type="text" 
+              class="form-control" 
+              id="original_url" 
+              name="original_url"
+              placeholder="https://example.com" 
+              required
+            >
+          </div>
+
+          <div class="mb-3">
+            <label for="max_redirects" class="form-label">For how many clicks? (1-5)</label>
+            <input 
+              type="number" 
+              class="form-control" 
+              id="max_redirects" 
+              name="max_redirects" 
+              value="1" 
+              min="1" 
+              max="1000"
+            >
+          </div>
+
+          <div class="mb-3">
+            <label for="trigger_email" class="form-label">
+              Enter your Email Address if you want to be notified when it's clicked (optional)
+            </label>
+            <input 
+              type="email" 
+              class="form-control" 
+              id="trigger_email" 
+              name="trigger_email" 
+              placeholder="you@example.com"
+            >
+            <small class="text-muted">We don't store your email address for any longer than is required.</small>
+          </div>
+
+          <div class="mb-3">
+            <label for="exceeded_url" class="form-label">
+              After the maximum clicks are exceeded, where do you want the link to go?
+            </label>
+            <input 
+              type="url" 
+              class="form-control" 
+              id="exceeded_url" 
+              name="exceeded_url"
+              placeholder="https://bing.com (for instance)"
+            >
+            <small class="text-muted">
+              (optional – if nothing is entered, visits will see a “link expired” notice)
+            </small>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100">Create Link</button>
+        </form>
+
+      </div>
     </div>
-    <div class="mb-3">
-      <label for="max_redirects" class="form-label">For how many clicks? (1-5)</label>
-      <input type="number" class="form-control" id="max_redirects" name="max_redirects" value="1" min="1" max="1000">
-    </div>
-    <div class="mb-3">
-      <label for="trigger_email" class="form-label">Enter your Email Address if you want to be notified when it's clicked (optional)</label>
-      <input type="email" class="form-control" id="trigger_email" name="trigger_email" placeholder="you@example.com">
-      <small class="text-muted">We don't store your email address for any longer than is required</small>
-    </div>
-    <div class="mb-3">
-      <label for="exceeded_url" class="form-label">After the maximum clicks are exceeded, where do you want the link to go?</label>
-      <input type="url" class="form-control" id="exceeded_url" name="exceeded_url"
-             placeholder="https://bing.com (for instance)">
-      <small class="text-muted">(optional - if nothing is entered, visits will see a "link expired" notice.)/small>
-    </div>
-    <button type="submit" class="btn btn-primary">Create Link</button>
-  </form>
-</div>
+  </div>
 </body>
 </html>
