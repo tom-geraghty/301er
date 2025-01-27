@@ -154,7 +154,7 @@ def index():
         # Basic validation
         if not original_url:
             return render_template('index.html', error="Original URL is required.")
-        if not re.match(r'^https?://', original_url):
+        if not re.match(r'^https?://', original_url, re.IGNORECASE):
             return render_template('index.html', error="URL must start with http:// or https://")
 
         try:
