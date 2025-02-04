@@ -10,11 +10,10 @@
 
   gtag('config', 'G-B5NNGZKFH2');
 </script>
-  <meta charset="UTF-8">
+   <meta charset="UTF-8">
   <title>Create a Redirect</title>
   <!-- Load Bootstrap CSS from a CDN -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
-  <!-- Viewport Meta Tag for Responsive Rendering on Mobile -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body class="bg-light">
@@ -50,7 +49,7 @@
           </div>
 
           <div class="mb-3">
-            <label for="max_redirects" class="form-label">For how many clicks? (1-5)</label>
+            <label for="max_redirects" class="form-label">For how many clicks? (1-5 for example)</label>
             <input 
               type="number" 
               class="form-control" 
@@ -64,7 +63,7 @@
 
           <div class="mb-3">
             <label for="trigger_email" class="form-label">
-              Enter your Email Address if you want to be notified when it's clicked (optional)
+              Enter your Email if you want to be notified on each click (optional)
             </label>
             <input 
               type="email" 
@@ -73,27 +72,47 @@
               name="trigger_email" 
               placeholder="you@example.com"
             >
-            <small class="text-muted">We don't store your email address for any longer than is required.</small>
+            <small class="text-muted">We'll send up to 5 total notifications.</small>
           </div>
 
           <div class="mb-3">
             <label for="exceeded_url" class="form-label">
-              After the maximum clicks are exceeded, where do you want the link to go?
+              After the maximum clicks or expiry, where should the link go?
             </label>
             <input 
               type="url" 
               class="form-control" 
               id="exceeded_url" 
               name="exceeded_url"
-              placeholder="https://bing.com (for instance)"
+              placeholder="https://google.com (default if empty)"
             >
-            <small class="text-muted">
-              (this will soon be optional, but for the moment you need to enter something.)
-            </small>
+          </div>
+
+          <div class="mb-3">
+            <label for="expiry_minutes" class="form-label">
+              Expire after how many minutes? (1 to 10080)
+            </label>
+            <input
+              type="number"
+              class="form-control"
+              id="expiry_minutes"
+              name="expiry_minutes"
+              value="60"
+              min="1"
+              max="10080"
+            >
+            <small class="text-muted">E.g., 60 = 1 hour, 1440 = 1 day, 10080 = 7 days.</small>
           </div>
 
           <button type="submit" class="btn btn-primary w-100">Create Link</button>
         </form>
+
+        <!-- Contact / Support Section -->
+        <div class="mt-5">
+          <p class="text-center">Need help or have a feature request?<br>
+            Contact us at <a href="mailto:support@301er.io">support@301er.io</a>.
+          </p>
+        </div>
 
       </div>
     </div>
