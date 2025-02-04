@@ -21,7 +21,7 @@
     <div class="row justify-content-center">
       <div class="col-12 col-md-8 col-lg-6">
         
-        <h1 class="mb-4 text-center">Supercharged 301s</h1>
+        <h1 class="mb-4 text-center">301er: send secure links</h1>
         
         {% if error %}
           <div class="alert alert-danger" role="alert">
@@ -37,7 +37,7 @@
 
         <form method="POST" action="/">
           <div class="mb-3">
-            <label for="original_url" class="form-label">Where do you want the link to forward to?</label>
+            <label for="original_url" class="form-label">Where do you want your link to go to?</label>
             <input 
               type="text" 
               class="form-control" 
@@ -49,7 +49,7 @@
           </div>
 
           <div class="mb-3">
-            <label for="max_redirects" class="form-label">For how many clicks? (1-5 for example)</label>
+            <label for="max_redirects" class="form-label">After how many clicks should it expire? (1-5)</label>
             <input 
               type="number" 
               class="form-control" 
@@ -77,7 +77,7 @@
 
           <div class="mb-3">
             <label for="exceeded_url" class="form-label">
-              After the maximum clicks or expiry, where should the link go?
+              After the maximum clicks or link expiry, where should the link go?
             </label>
             <input 
               type="url" 
@@ -90,7 +90,7 @@
 
           <div class="mb-3">
             <label for="expiry_minutes" class="form-label">
-              Expire after how many minutes? (1 to 10080)
+              How long should this link last before it expires? (1 to 10080 minutes)
             </label>
             <input
               type="number"
@@ -109,7 +109,7 @@
 
         <!-- Contact / Support Section -->
         <div class="mt-5">
-          <p class="text-center">Need help or have a feature request?<br>
+          <p class="text-center">Email addresses and URLs are encrypted in transit and at rest, and deleted after expiry. Need help or have a feature request?<br>
             Contact us at <a href="mailto:support@301er.io">support@301er.io</a>.
           </p>
         </div>
