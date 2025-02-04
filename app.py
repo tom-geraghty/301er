@@ -1,13 +1,40 @@
 import os
-import sqlite3
 import re
-from datetime import datetime
+import sqlite3
+from datetime import datetime, timedelta
+
 from flask import Flask, request, redirect, render_template, url_for
 import requests
+
+from cryptography.fernet import Fernet
 
 app = Flask(__name__)
 
 DATABASE = 'database.db'
+
+# --- Encryption Setup ---
+# Make sure you set an environment variable ENCRYPT_KEY with a valid Fernet key.
+# Example: export ENCRYPT_KEY="JLOMv90cni7Ji4RKfGuw1riNplUKZCWOYjBRg50D9xM="
+ENCRYPT_KEY = os.environ.get('ENCRYPT_KEY', None)
+if not ENCRYPT_KEY:
+    # For demonstration, but in production, raise an error or generate a key.
+    print("[WARNING] ENCRYPT_KEY not set. Using an insecure fallback key!")
+    ENCRYPT_KEY = Fernet.generate_key()
+
+fernet = Fernet(ENCRYPT_KEY)
+
+def encrypt_string(plaintext: str) -> str:
+    """Encrypt a plaintext string using Fernet."""
+    if not plaintext:
+        return ""
+    return fernet.encrypt(plaintext.encode('utf-8')).decode('utf-8')
+
+def decrypt_string(ciphertext: str) -> str:
+    """Decrypt a ciphertext string using Fernet."""
+    if not ciphertext:
+        return ""
+    return fernet.decrypt(ciphertext.encode('utf-8')).decode('utf-8')
+
 
 # For SendLayer
 SENDLAYER_API_KEY = os.environ.get('SENDLAYER_API_KEY')  # e.g. store in Render env variable
@@ -17,7 +44,6 @@ SENDLAYER_FROM_EMAIL = os.environ.get('SENDLAYER_FROM_EMAIL', 'noreply@301er.io'
 KNOWN_BOT_PATTERNS = [
     'bot', 'spider', 'crawl', 'slurp', 'facebookexternalhit', 'mediapartners-google'
 ]
-
 
 def is_bot(user_agent: str) -> bool:
     """Very naive check for common bot/spider user-agents."""
@@ -47,7 +73,8 @@ def init_db():
                 current_count INTEGER NOT NULL DEFAULT 0,
                 trigger_email TEXT,
                 exceeded_url TEXT,
-                email_count INTEGER NOT NULL DEFAULT 0
+                email_count INTEGER NOT NULL DEFAULT 0,
+                expiration_timestamp TEXT
             );
         ''')
     print("Database initialized.")
@@ -60,8 +87,6 @@ def generate_short_id():
 
 
 # ----- Notification Triggers -----
-import requests
-
 def send_email_notification(api_key, from_email, to_email, short_id,
                             original_url, user_agent, ip, click_time):
     """
@@ -73,7 +98,6 @@ def send_email_notification(api_key, from_email, to_email, short_id,
         print("[WARNING] SENDLAYER_API_KEY is not set. Email not sent.")
         return
 
-    # According to the latest docs, the base URL is console.sendlayer.com/api/v1/
     url = "https://console.sendlayer.com/api/v1/email"
 
     subject = f"Your Link {short_id} ({original_url}) was triggered"
@@ -96,29 +120,19 @@ def send_email_notification(api_key, from_email, to_email, short_id,
         f"</ul>"
     )
 
-    # Notice how "From", "To", "Subject", "ContentType", "HTMLContent", "PlainContent"
-    # are capitalized to match the docs exactly.
     payload = {
         "From": {
-            # "name": "Optional Sender Name",
             "email": from_email
         },
         "To": [
             {
-                # "name": "Optional Recipient Name",
                 "email": to_email
             }
         ],
         "Subject": subject,
-        "ContentType": "HTML",         # Must match "HTML" or "text" or whichever type you intend.
+        "ContentType": "HTML",
         "HTMLContent": html_content,
         "PlainContent": plain_content
-
-        # Optional keys you can include:
-        # "Tags": ["tag1", "tag2"],
-        # "Headers": {
-        #     "X-Mailer": "Flask Application"
-        # },
     }
 
     headers = {
@@ -136,7 +150,6 @@ def send_email_notification(api_key, from_email, to_email, short_id,
         print(f"[ERROR] Exception while sending email: {e}")
 
 
-
 # ----- Flask Routes -----
 
 @app.route('/', methods=['GET', 'POST'])
@@ -150,6 +163,7 @@ def index():
         max_redirects = request.form.get('max_redirects', '1')
         trigger_email = request.form.get('trigger_email', '').strip()
         exceeded_url = request.form.get('exceeded_url', '').strip()
+        expiry_minutes = request.form.get('expiry_minutes', '1').strip()
 
         # Basic validation
         if not original_url:
@@ -164,17 +178,35 @@ def index():
         except ValueError:
             return render_template('index.html', error="Max redirects must be an integer between 1 and 1000.")
 
+        # If no exceeded_url is provided, default to google
+        if not exceeded_url:
+            exceeded_url = 'https://google.com'
+
+        # Parse expiry_minutes
+        try:
+            minutes = int(expiry_minutes)
+            if minutes < 1 or minutes > 10080:  # up to 7 days in minutes
+                raise ValueError
+        except ValueError:
+            return render_template('index.html', error="Expiry must be an integer between 1 minute and 10080 (7 days).")
+
+        expiration_time = datetime.utcnow() + timedelta(minutes=minutes)
+        expiration_timestamp = expiration_time.isoformat()
+
         short_id = generate_short_id()
 
-        # Insert into DB
+        # Encrypt fields
+        enc_original_url = encrypt_string(original_url)
+        enc_exceeded_url = encrypt_string(exceeded_url)
+        enc_trigger_email = encrypt_string(trigger_email)
+
         with get_db() as conn:
             conn.execute('''
                 INSERT INTO redirect_links
-                (short_id, original_url, max_redirects, current_count, trigger_email, exceeded_url, email_count)
-                VALUES (?, ?, ?, 0, ?, ?, 0);
-            ''', (short_id, original_url, max_redirects, trigger_email, exceeded_url))
+                (short_id, original_url, max_redirects, current_count, trigger_email, exceeded_url, email_count, expiration_timestamp)
+                VALUES (?, ?, ?, 0, ?, ?, 0, ?);
+            ''', (short_id, enc_original_url, max_redirects, enc_trigger_email, enc_exceeded_url, expiration_timestamp))
 
-        # Return or show result
         short_url = request.url_root.rstrip('/') + url_for('redirect_handler', short_id=short_id)
         return render_template('index.html', short_url=short_url)
 
@@ -187,13 +219,17 @@ def redirect_handler(short_id):
     """
     When someone accesses /r/<short_id>, we check:
     - If it exists in DB
-    - If current_count < max_redirects -> increment, optionally send email (up to 5 times), redirect to original
-    - If limit is exceeded -> redirect to 'exceeded_url' if provided, otherwise show 'expired' page
+    - Decrypt the stored values
+    - Check if current_count < max_redirects
+    - Check if current time < expiration_timestamp
+    - If either limit is exceeded or time is past, redirect to the exceeded_url or show expired page
+    - If valid, increment, optionally send email (up to 5 times), then redirect to the original
     - Filter out bots by user-agent (no increment or email if bot)
+    - Once expired or limit reached, remove from DB
     """
     user_agent = request.headers.get('User-Agent', '')
     ip = request.remote_addr or 'Unknown IP'
-    click_time = datetime.utcnow().isoformat()
+    click_time = datetime.utcnow()
 
     with get_db() as conn:
         row = conn.execute('SELECT * FROM redirect_links WHERE short_id = ?;', (short_id,)).fetchone()
@@ -201,39 +237,62 @@ def redirect_handler(short_id):
         if not row:
             return render_template('expired.html', message="This link does not exist."), 404
 
-        # If we've already reached the limit
-        if row['current_count'] >= row['max_redirects']:
+        # Decrypt fields
+        dec_original_url = decrypt_string(row['original_url'])
+        dec_exceeded_url = decrypt_string(row['exceeded_url']) or 'https://google.com'
+        dec_trigger_email = decrypt_string(row['trigger_email'])
+
+        max_redirects = row['max_redirects']
+        current_count = row['current_count']
+        expiration_timestamp = row['expiration_timestamp']
+
+        # Check if the link is expired by time
+        link_expiry_time = None
+        if expiration_timestamp:
+            try:
+                link_expiry_time = datetime.fromisoformat(expiration_timestamp)
+            except ValueError:
+                # If somehow invalid, treat it as expired or default to safe
+                link_expiry_time = datetime(1970, 1, 1)
+
+        is_time_expired = (link_expiry_time and (click_time >= link_expiry_time))
+
+        # If we've already reached the limit or time is expired
+        if current_count >= max_redirects or is_time_expired:
             # If there's an exceeded_url, redirect there; else show an expired page
-            if row['exceeded_url']:
-                return redirect(row['exceeded_url'], code=301)
+            if dec_exceeded_url:
+                # Clean up the row to remove sensitive data
+                conn.execute('DELETE FROM redirect_links WHERE short_id = ?;', (short_id,))
+                return redirect(dec_exceeded_url, code=301)
             else:
+                # Clean up the row
+                conn.execute('DELETE FROM redirect_links WHERE short_id = ?;', (short_id,))
                 return render_template('expired.html', message="This link has expired."), 200
 
-        # We haven't hit the limit yet
+        # Not expired yet, or usage limit not reached
         # Check if it's a bot
         if is_bot(user_agent):
-            # Bot: do NOT increment or send email, but still go to original_url?
-            # Or skip redirect? You can decide. Let's skip the increment & triggers, but still redirect.
-            return redirect(row['original_url'], code=301)
+            # Bot: do NOT increment or send email, but still redirect
+            return redirect(dec_original_url, code=301)
         else:
-            new_count = row['current_count'] + 1
-            # Also see if we can still send an email (only up to 5 times)
+            new_count = current_count + 1
             new_email_count = row['email_count']
-            if row['trigger_email'] and row['email_count'] < 5:
-                # Send the email
+
+            # Possibly send email, up to 5 times
+            if dec_trigger_email and new_email_count < 5:
                 send_email_notification(
                     api_key=SENDLAYER_API_KEY,
                     from_email=SENDLAYER_FROM_EMAIL,
-                    to_email=row['trigger_email'],
+                    to_email=dec_trigger_email,
                     short_id=row['short_id'],
-                    original_url=row['original_url'],
+                    original_url=dec_original_url,
                     user_agent=user_agent,
                     ip=ip,
-                    click_time=click_time
+                    click_time=click_time.isoformat()
                 )
                 new_email_count += 1
 
-            # Update DB
+            # Update usage
             conn.execute('''
                 UPDATE redirect_links
                 SET current_count = ?, email_count = ?
@@ -241,12 +300,10 @@ def redirect_handler(short_id):
             ''', (new_count, new_email_count, short_id))
 
     # Finally, redirect to the original URL
-    return redirect(row['original_url'], code=301)
+    return redirect(dec_original_url, code=301)
 
 
 # ----- Main Entrypoint -----
-# Move init_db() outside of the if __name__ == '__main__' block
-# so it's called on Render when Gunicorn starts.
 init_db()
 
 if __name__ == '__main__':
