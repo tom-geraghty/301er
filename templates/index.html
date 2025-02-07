@@ -20,9 +20,9 @@
   <div class="container py-5">
     <div class="row justify-content-center">
       <div class="col-12 col-md-8 col-lg-6">
-        
+
         <h1 class="mb-4 text-center">301er: send secure links</h1>
-        
+
         {% if error %}
           <div class="alert alert-danger" role="alert">
             {{ error }}
@@ -38,51 +38,24 @@
         <form method="POST" action="/">
           <div class="mb-3">
             <label for="original_url" class="form-label">Where do you want your link to go to?</label>
-            <input 
-              type="text" 
-              class="form-control" 
-              id="original_url" 
+            <input
+              type="text"
+              class="form-control"
+              id="original_url"
               name="original_url"
-              placeholder="https://example.com" 
+              placeholder="https://example.com"
               required
             >
-          </div>
-
-          <div class="mb-3">
-            <label for="max_redirects" class="form-label">After how many clicks should it expire? (1-5)</label>
-            <input 
-              type="number" 
-              class="form-control" 
-              id="max_redirects" 
-              name="max_redirects" 
-              value="1" 
-              min="1" 
-              max="1000"
-            >
-          </div>
-
-          <div class="mb-3">
-            <label for="trigger_email" class="form-label">
-              Enter your Email if you want to be notified on each click (optional)
-            </label>
-            <input 
-              type="email" 
-              class="form-control" 
-              id="trigger_email" 
-              name="trigger_email" 
-              placeholder="you@example.com"
-            >
-            <small class="text-muted">We'll send up to 5 total notifications.</small>
           </div>
 
           <div class="mb-3">
             <label for="exceeded_url" class="form-label">
               After the maximum clicks or link expiry, where should the link go?
             </label>
-            <input 
-              type="url" 
-              class="form-control" 
-              id="exceeded_url" 
+            <input
+              type="url"
+              class="form-control"
+              id="exceeded_url"
               name="exceeded_url"
               placeholder="https://google.com (default if empty)"
             >
@@ -103,6 +76,33 @@
             >
             <small class="text-muted">E.g., 60 = 1 hour, 1440 = 1 day, 10080 = 7 days.</small>
           </div>
+
+          <div class="mb-3">
+            <label for="max_redirects" class="form-label">Alternatively, after how many clicks should it expire? (1-5)</label>
+            <input
+              type="number"
+              class="form-control"
+              id="max_redirects"
+              name="max_redirects"
+              value="1"
+              min="1"
+              max="1000"
+            >
+          </div>
+
+          <div class="mb-3">
+            <label for="trigger_email" class="form-label">
+              Enter your Email if you want to be notified on each click (optional)
+            </label>
+            <input
+              type="email"
+              class="form-control"
+              id="trigger_email"
+              name="trigger_email"
+              placeholder="you@example.com"
+            >
+            <small class="text-muted">We'll send up to 5 total notifications.</small>
+          </div>        
 
           <button type="submit" class="btn btn-primary w-100">Create Link</button>
         </form>
