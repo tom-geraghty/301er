@@ -13,8 +13,6 @@ app = Flask(__name__)
 DATABASE = 'database.db'
 
 # --- Encryption Setup ---
-# Make sure you set an environment variable ENCRYPT_KEY with a valid Fernet key.
-# Example: export ENCRYPT_KEY="JLOMv90cni7Ji4RKfGuw1riNplUKZCWOYjBRg50D9xM="
 ENCRYPT_KEY = os.environ.get('ENCRYPT_KEY', None)
 if not ENCRYPT_KEY:
     # For demonstration, but in production, raise an error or generate a key.
@@ -42,7 +40,8 @@ SENDLAYER_FROM_EMAIL = os.environ.get('SENDLAYER_FROM_EMAIL', 'noreply@301er.io'
 
 # ----- Basic Bot Detection Setup -----
 KNOWN_BOT_PATTERNS = [
-    'bot', 'spider', 'crawl', 'slurp', 'facebookexternalhit', 'mediapartners-google'
+    'bot', 'spider', 'crawl', 'slurp',
+    'facebookexternalhit', 'mediapartners-google'
 ]
 
 def is_bot(user_agent: str) -> bool:
@@ -51,7 +50,6 @@ def is_bot(user_agent: str) -> bool:
         return False
     ua_lower = user_agent.lower()
     return any(bot_substring in ua_lower for bot_substring in KNOWN_BOT_PATTERNS)
-
 
 # ----- Database Helpers -----
 def get_db():
@@ -63,7 +61,6 @@ def get_db():
 def init_db():
     """Create or update the table if it doesn't exist, adding any new columns if necessary."""
     with get_db() as conn:
-        # Create the base table if needed
         conn.execute('''
             CREATE TABLE IF NOT EXISTS redirect_links (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -149,49 +146,56 @@ def send_email_notification(api_key, from_email, to_email, short_id,
     except Exception as e:
         print(f"[ERROR] Exception while sending email: {e}")
 
-
 # ----- Flask Routes -----
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
     """
-    Displays a form (using Bootstrap) to create a new redirect link.
+    Displays a form to create a new redirect link.
     On POST, it handles the creation logic.
     """
     if request.method == 'POST':
         original_url = request.form.get('original_url', '').strip()
-        max_redirects = request.form.get('max_redirects', '1')
+        max_redirects_str = request.form.get('max_redirects', '0').strip()
         trigger_email = request.form.get('trigger_email', '').strip()
         exceeded_url = request.form.get('exceeded_url', '').strip()
-        expiry_minutes = request.form.get('expiry_minutes', '1').strip()
+        expiry_minutes_str = request.form.get('expiry_minutes', '0').strip()
 
-        # Basic validation
+        # Validate the original URL
         if not original_url:
             return render_template('index.html', error="Original URL is required.")
         if not re.match(r'^https?://', original_url, re.IGNORECASE):
             return render_template('index.html', error="URL must start with http:// or https://")
 
+        # Convert max_redirects to int
         try:
-            max_redirects = int(max_redirects)
-            if max_redirects < 1 or max_redirects > 1000:
+            max_redirects = int(max_redirects_str)
+            if max_redirects < 0 or max_redirects > 1000:
                 raise ValueError
         except ValueError:
-            return render_template('index.html', error="Max redirects must be an integer between 1 and 1000.")
+            return render_template('index.html', error="Max redirects must be between 0 and 1000.")
+
+        # Convert expiry_minutes to int
+        try:
+            expiry_minutes = int(expiry_minutes_str)
+            if expiry_minutes < 0 or expiry_minutes > 10080:  # up to 7 days
+                raise ValueError
+        except ValueError:
+            return render_template('index.html', error="Expiry must be between 0 and 10080 minutes (7 days).")
+
+        # If the user sets neither expiry nor max_redirects, it's an error.
+        if max_redirects == 0 and expiry_minutes == 0:
+            return render_template('index.html', error="Please set at least a time expiry or a max-click limit.")
 
         # If no exceeded_url is provided, default to google
         if not exceeded_url:
             exceeded_url = 'https://google.com'
 
-        # Parse expiry_minutes
-        try:
-            minutes = int(expiry_minutes)
-            if minutes < 1 or minutes > 10080:  # up to 7 days in minutes
-                raise ValueError
-        except ValueError:
-            return render_template('index.html', error="Expiry must be an integer between 1 minute and 10080 (7 days).")
-
-        expiration_time = datetime.utcnow() + timedelta(minutes=minutes)
-        expiration_timestamp = expiration_time.isoformat()
+        # Build the expiration timestamp if we have an expiry
+        expiration_timestamp = ""
+        if expiry_minutes > 0:
+            expiration_time = datetime.utcnow() + timedelta(minutes=expiry_minutes)
+            expiration_timestamp = expiration_time.isoformat()
 
         short_id = generate_short_id()
 
@@ -205,7 +209,14 @@ def index():
                 INSERT INTO redirect_links
                 (short_id, original_url, max_redirects, current_count, trigger_email, exceeded_url, email_count, expiration_timestamp)
                 VALUES (?, ?, ?, 0, ?, ?, 0, ?);
-            ''', (short_id, enc_original_url, max_redirects, enc_trigger_email, enc_exceeded_url, expiration_timestamp))
+            ''', (
+                short_id,
+                enc_original_url,
+                max_redirects,
+                enc_trigger_email,
+                enc_exceeded_url,
+                expiration_timestamp
+            ))
 
         short_url = request.url_root.rstrip('/') + url_for('redirect_handler', short_id=short_id)
         return render_template('index.html', short_url=short_url)
@@ -217,15 +228,14 @@ def index():
 @app.route('/r/<short_id>')
 def redirect_handler(short_id):
     """
-    When someone accesses /r/<short_id>, we check:
-    - If it exists in DB
+    When someone accesses /r/<short_id>:
     - Decrypt the stored values
-    - Check if current_count < max_redirects
-    - Check if current time < expiration_timestamp
-    - If either limit is exceeded or time is past, redirect to the exceeded_url or show expired page
-    - If valid, increment, optionally send email (up to 5 times), then redirect to the original
-    - Filter out bots by user-agent (no increment or email if bot)
-    - Once expired or limit reached, remove from DB
+    - If there's a time expiry, check if it's past
+    - If there's a max_redirect limit, check if we've exceeded it
+    - If limit/expiry is reached, wipe the original_url in the DB
+      (to remove sensitive data) and always redirect to exceeded_url.
+    - Otherwise, increment usage, optionally send email, and redirect
+      to the original.
     """
     user_agent = request.headers.get('User-Agent', '')
     ip = request.remote_addr or 'Unknown IP'
@@ -244,35 +254,38 @@ def redirect_handler(short_id):
 
         max_redirects = row['max_redirects']
         current_count = row['current_count']
-        expiration_timestamp = row['expiration_timestamp']
+        expiration_timestamp = row['expiration_timestamp'] or ""
 
-        # Check if the link is expired by time
-        link_expiry_time = None
+        # 1. Time-based expiry check
+        is_time_expired = False
         if expiration_timestamp:
             try:
                 link_expiry_time = datetime.fromisoformat(expiration_timestamp)
+                if click_time >= link_expiry_time:
+                    is_time_expired = True
             except ValueError:
-                # If somehow invalid, treat it as expired or default to safe
-                link_expiry_time = datetime(1970, 1, 1)
+                # If somehow invalid, treat it as expired
+                is_time_expired = True
 
-        is_time_expired = (link_expiry_time and (click_time >= link_expiry_time))
+        # 2. Click-based expiry check
+        is_click_expired = False
+        if max_redirects > 0 and current_count >= max_redirects:
+            is_click_expired = True
 
-        # If we've already reached the limit or time is expired
-        if current_count >= max_redirects or is_time_expired:
-            # If there's an exceeded_url, redirect there; else show an expired page
-            if dec_exceeded_url:
-                # Clean up the row to remove sensitive data
-                conn.execute('DELETE FROM redirect_links WHERE short_id = ?;', (short_id,))
-                return redirect(dec_exceeded_url, code=301)
-            else:
-                # Clean up the row
-                conn.execute('DELETE FROM redirect_links WHERE short_id = ?;', (short_id,))
-                return render_template('expired.html', message="This link has expired."), 200
+        # If we've reached time expiry or click limit,
+        # we permanently redirect to 'exceeded_url'.
+        if is_time_expired or is_click_expired:
+            # Wipe the original_url from DB (but keep the row).
+            conn.execute('''
+                UPDATE redirect_links
+                SET original_url = ''
+                WHERE short_id = ?;
+            ''', (short_id,))
+            return redirect(dec_exceeded_url, code=301)
 
-        # Not expired yet, or usage limit not reached
-        # Check if it's a bot
+        # Not expired: proceed with normal redirect
         if is_bot(user_agent):
-            # Bot: do NOT increment or send email, but still redirect
+            # Bot: do NOT increment or send email
             return redirect(dec_original_url, code=301)
         else:
             new_count = current_count + 1
