@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>301er.io: Send Secure Links</title>
+  <title>301er: Send Secure Links</title>
   
   <!-- Viewport meta for mobile responsiveness -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -37,7 +37,7 @@
         <!-- Page Heading -->
         <div class="text-center mb-4">
           <h1 class="display-5">Send Secure Links</h1>
-          <p class="text-muted">Create a short link with optional click or time-based expiry. Prevent and identify snooping.</p>
+          <p class="text-muted">Create a short link with optional click or time-based expiry.</p>
         </div>
 
         <!-- Error Alert -->
@@ -62,7 +62,7 @@
               <!-- Original URL -->
               <div class="mb-3">
                 <label for="original_url" class="form-label fw-semibold">
-                  Original URL <span class="text-danger">*</span>
+                  Your URL <span class="text-danger">*</span>
                 </label>
                 <input
                   type="text"
@@ -72,30 +72,14 @@
                   placeholder="https://example.com"
                   required
                 >
-                <div class="form-text">Where do you want your link to go?</div>
+                <div class="form-text">Where do you want your secure link to direct to?</div>
               </div>
 
-              <!-- Exceeded URL -->
-              <div class="mb-3">
-                <label for="exceeded_url" class="form-label fw-semibold">
-                  Exceeded/Expired Redirect
-                </label>
-                <input
-                  type="url"
-                  class="form-control"
-                  id="exceeded_url"
-                  name="exceeded_url"
-                  placeholder="https://google.com (default if empty)"
-                >
-                <div class="form-text">
-                  When the link is expired (by time or clicks), visitors go here instead.
-                </div>
-              </div>
 
               <!-- Expiry in Minutes -->
               <div class="mb-3">
                 <label for="expiry_minutes" class="form-label fw-semibold">
-                  Expire After (Minutes)
+                  How long do you want your link to last for? (Minutes) After this, visitors will be sent to the expired redirect URL below.
                 </label>
                 <input
                   type="number"
@@ -114,7 +98,7 @@
               <!-- Max Redirects -->
               <div class="mb-3">
                 <label for="max_redirects" class="form-label fw-semibold">
-                  Max Clicks
+                  How many times can it be clicked? After this, visitors will be sent to the expired redirect URL below.
                 </label>
                 <input
                   type="number"
@@ -127,6 +111,24 @@
                 >
                 <div class="form-text">
                   Set to 0 for no click-based limit.
+                </div>
+              </div>
+
+
+              <!-- Exceeded URL -->
+              <div class="mb-3">
+                <label for="exceeded_url" class="form-label fw-semibold">
+                  Exceeded/Expired Redirect
+                </label>
+                <input
+                  type="url"
+                  class="form-control"
+                  id="exceeded_url"
+                  name="exceeded_url"
+                  placeholder="https://google.com (default if empty)"
+                >
+                <div class="form-text">
+                  Where do you want visitors to go after the link expires or the clicks run out? 
                 </div>
               </div>
 
@@ -143,7 +145,7 @@
                   placeholder="you@example.com"
                 >
                 <div class="form-text">
-                  Optional: get an email notification for each click (max 5).
+                  Optional: get an email notification when your link is clicked (max 5). For example, this can be useful if you think someone is snooping on your messages.
                 </div>
               </div>
 
@@ -162,7 +164,7 @@
         <div class="mt-4 text-center">
           <p class="mb-1">
             <small class="text-muted">
-              <em>Email addresses and URLs are encrypted at rest, and removed after expiry.</em>
+              <em>Email addresses and URLs are encrypted at rest and in transit, and removed after expiry.</em>
             </small>
           </p>
           <p>
